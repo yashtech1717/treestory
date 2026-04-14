@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Memory Tree · Silent Echoes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: #000000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        canvas {
+            display: block;
+            filter: drop-shadow(0 0 12px #1de93b);
+            cursor: pointer;
+        }
+
+        /* INTRO - cinematic */
+        #intro {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #0a1f0a, #000000);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: #d4ffb0;
+            text-shadow: 0 0 20px #1de93b, 0 0 5px #0a4f1a;
+            z-index: 20;
+            backdrop-filter: blur(3px);
+            padding: 2rem;
+            line-height: 1.5;
+            animation: fadeOutGlow 4.5s ease-in-out forwards 3.5s;
+            pointer-events: none;
+            font-family: 'Georgia', serif;
+        }
+
+        @keyframes fadeOutGlow {
+            0% { opacity: 1; backdrop-filter: blur(3px); }
+            70% { opacity: 0.9; }
+            100% { opacity: 0; visibility: hidden; backdrop-filter: blur(0); }
+        }
+
+        /* DIARY MASTER - minimal, only timeline + person info + add button */
+        .diary-master {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.96);
+            backdrop-filter: blur(16px);
+            z-index: 40;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            animation: fadeInBack 0.4s ease;
+        }
+
+        @keyframes fadeInBack {
+            from { opacity: 0; backdrop-filter: blur(0px); }
+            to { opacity: 1; backdrop-filter: blur(16px); }
+        }
+
+        .master-panel {
+            width: 90%;
+            max-width: 1200px;
+            height: 85%;
+            background: transparent;
+            display: flex;
+            gap: 2rem;
+            align-items: stretch;
+        }
+
+        /* ========= LEFT: TIMELINE (only line + dots) ========= */
+        .timeline-section {
+            width: 180px;
+            background: rgba(10, 10, 5, 0.5);
+            backdrop-filter: blur(4px);
+            border-radius: 48px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 0;
+            border: 1px solid rgba(29, 233, 59, 0.3);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .timeline-title {
+            font-size: 0.7rem;
+            color: #9bc48b;
+            letter-spacing: 3px;
+            margin-bottom: 25px;
+            font-weight: 300;
+        }
+
+        .timeline-vertical {
+            position: relative;
+            width: 2px;
+            background: linear-gradient(to bottom, #1de93b, #9bc48b, #f5c542);
+            border-radius: 2px;
+            height: 70%;
+            margin-top: 10px;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -9px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border: 1.5px solid #f5f0c0;
+            z-index: 10;
+        }
+
+        .timeline-dot:hover {
+            transform: scale(1.5);
+            box-shadow: 0 0 18px #1de93b;
+        }
+
+        .timeline-dot::after {
+            content: attr(data-title);
+            position: absolute;
+            left: 28px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #0a0a0a;
+            color: #e6e6c0;
+            padding: 5px 12px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: bold;
+            white-space: nowrap;
+            font-family: monospace;
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.15s;
+            z-index: 100;
+            border: 1px solid #1de93b;
+            box-shadow: 0 2px 10px black;
+        }
+
+        .timeline-dot:hover::after {
+            opacity: 1;
+        }
+
+        .mood-happy { background: radial-gradient(circle at 30% 30%, #FFD966, #E6B800); }
+        .mood-sad { background: radial-gradient(circle at 30% 30%, #6ab0de, #2e5f8a); }
+        .mood-angry { background: radial-gradient(circle at 30% 30%, #ff6e5c, #bc3f2e); }
+        .mood-neutral { background: radial-gradient(circle at 30% 30%, #9bc48b, #4e7840); }
+
+        .stats-mini {
+            font-size: 0.65rem;
+            color: #7c8a60;
+            margin-top: 25px;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        /* ========= RIGHT PANEL: person info + empty space + add button ========= */
+        .info-section {
+            flex: 1;
+            background: rgba(5, 5, 3, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            border: 1px solid rgba(29, 233, 59, 0.2);
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .person-card {
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .person-name-large {
+            font-size: 4rem;
+            font-family: 'Georgia', serif;
+            color: #d4ffb0;
+            text-shadow: 0 0 15px #1de93b;
+            letter-spacing: 2px;
+            margin-bottom: 1rem;
+        }
+
+        .soul-quote {
+            font-size: 1rem;
+            font-style: italic;
+            color: #b8b48c;
+            border-top: 1px solid #3a4a2a;
+            border-bottom: 1px solid #3a4a2a;
+            padding: 1rem 0;
+            margin: 1.5rem 0;
+            font-family: 'Georgia', serif;
+        }
+
+        .empty-whisper {
+            color: #6a724a;
+            font-size: 0.85rem;
+            margin-top: 2rem;
+            letter-spacing: 1px;
+        }
+
+        /* memory adder - hidden box (only appears when add button clicked) */
+        .memory-adder {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 320px;
+            background: #11110cee;
+            backdrop-filter: blur(16px);
+            border-radius: 32px;
+            padding: 18px 20px;
+            border: 1px solid #1de93b88;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            display: none;
+            z-index: 50;
+            transition: all 0.3s ease;
+        }
+
+        .memory-adder.visible {
+            display: block;
+            animation: fadeSlide 0.25s ease;
+        }
+
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .memory-adder h4 {
+            color: #c7e894;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+
+        textarea, .hashtag-input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 24px;
+            border: 1px solid #4a5a2a;
+            background: #1a1a10;
+            color: #f0f0d8;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .btn-save {
+            background: #2c3e1a;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 40px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+        }
+
+        .btn-save:hover {
+            background: #1de93b;
+            color: #021000;
+        }
+
+        .voice-row {
+            display: flex;
+            gap: 8px;
+            margin: 8px 0;
+        }
+
+        .mini-btn {
+            background: #2c321c;
+            color: #cfdfa3;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        /* add memory floating button */
+        .add-memory-float {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: #1e2a0e;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 60px;
+            color: #e6e6b3;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: monospace;
+            font-size: 1rem;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 45;
+        }
+
+        .add-memory-float:hover {
+            background: #1de93b;
+            color: #031000;
+            box-shadow: 0 0 15px #1de93b;
+        }
+
+        .close-diary-btn {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+            background: #1a1f0e;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 60px;
+            color: #cfdfa3;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            z-index: 45;
+        }
+
+        .close-diary-btn:hover {
+            background: #1de93b;
+            color: black;
+        }
+
+        /* filter pills tiny */
+        .filter-bar {
+            position: absolute;
+            top: 25px;
+            left: 30px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            max-width: 60%;
+        }
+
+        .cat-pill {
+            background: #262e1aaa;
+            padding: 4px 14px;
+            border-radius: 60px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #cbe4a2;
+            backdrop-filter: blur(4px);
+        }
+
+        .cat-pill.active {
+            background: #1de93b;
+            color: #021000;
+            box-shadow: 0 0 8px #6eff4a;
+        }
+
+        /* view modal */
+        .view-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.96);
+            backdrop-filter: blur(12px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .view-card {
+            background: #12120c;
+            max-width: 500px;
+            width: 85%;
+            border-radius: 48px;
+            padding: 32px;
+            text-align: center;
+            border: 1px solid #1de93b;
+        }
+
+        .floating-heart {
+            position: fixed;
+            pointer-events: none;
+            font-size: 1.8rem;
+            animation: floatHeart 2s ease-out forwards;
+            z-index: 300;
+        }
+
+        @keyframes floatHeart {
+            0% { opacity: 1; transform: translateY(0) scale(0.8);}
+            100% { opacity: 0; transform: translateY(-100px) scale(1.4);}
+        }
+    </style>
+</head>
+<body>
+
+<div id="intro">
+    ✦ "This tree is not just branches and lines...<br>
+    It holds the people we never truly lost,<br>
+    the memories we never forgot." ✦
+</div>
+
+<canvas id="tree"></canvas>
+
+<!-- DIARY MASTER - minimal: only timeline line/dots + person info + add button (no memory boxes) -->
+<div id="diaryMaster" class="diary-master">
+    <div class="master-panel">
+        <!-- LEFT: pure timeline with dots -->
+        <div class="timeline-section">
+            <div class="timeline-title">✦ THREADS OF TIME ✦</div>
+            <div class="timeline-vertical" id="timelineContainer"></div>
+            <div class="stats-mini" id="memoryStats"></div>
+        </div>
+
+        <!-- RIGHT: person info and empty elegant space -->
+        <div class="info-section">
+            <button class="close-diary-btn" id="closeMasterDiary">↺ exit</button>
+            <button class="add-memory-float" id="toggleAddMemoryBtn">✍️ + Add Memory</button>
+            
+            <div class="filter-bar" id="filterBar"></div>
+
+            <div class="person-card">
+                <div class="person-name-large" id="diaryPersonName">——</div>
+                <div class="soul-quote" id="dynamicQuote">"every heartbeat leaves an echo"</div>
+                <div class="empty-whisper" id="emptyHint">✦ click on any dot to read a memory ✦</div>
+            </div>
+
+            <!-- hidden adder panel (floating) -->
+            <div id="memoryAdderPanel" class="memory-adder">
+                <h4>🌱 preserve a moment</h4>
+                <textarea id="memoryText" rows="2" placeholder="what happened..."></textarea>
+                <input type="text" id="hashTags" class="hashtag-input" placeholder="#happy #sad #love ...">
+                <div class="voice-row">
+                    <button id="voiceInputBtn" class="mini-btn">🎤 Speak</button>
+                    <button id="startRecordBtn" class="mini-btn">⏺ Record</button>
+                    <button id="stopRecordBtn" class="mini-btn">⏹ Stop</button>
+                </div>
+                <button id="saveNewMemory" class="btn-save">🌿 save forever</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VIEW MODAL -->
+<div id="viewModal" class="view-modal">
+    <div class="view-card" id="viewModalContent" onclick="event.stopPropagation()">
+        <h2 id="modalTitle" style="color:#d4ffb0;"></h2>
+        <p id="modalText" style="margin:16px 0; line-height:1.5;"></p>
+        <div id="modalAudio"></div>
+        <div id="modalVoiceControls" style="margin-top: 16px;"></div>
+        <button id="closeModalBtn" style="margin-top:20px; background:#2a3b1a; color:white; padding:6px 24px; border-radius:40px; border:none;">close</button>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ----------------------------- TREE LOGIC -------------------------
+        const canvas = document.getElementById("tree");
+        const ctx = canvas.getContext("2d");
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        
+        const soulNames = ["Elena", "Oliver", "Ivy", "Arthur", "Luna", "Caspian", "Wren", "Nova", "Silas", "Elara", "Milo", "Iris", "Theo", "Aurora"];
+        let flowers = [];
+        let mouse = { x: width/2, y: height/2 };
+        let activeFlower = null;
+        let treeData = null;
+        let currentActivePerson = "";
+        
+        // ----------------------------- MEMORY DATABASE -----------------
+        let memoriesDB = {};  
+        
+        function saveToLocal() {
+            localStorage.setItem("memoryTreePureMinimal", JSON.stringify(memoriesDB));
+        }
+        
+        function loadFromLocal() {
+            const raw = localStorage.getItem("memoryTreePureMinimal");
+            if (raw) {
+                try {
+                    memoriesDB = JSON.parse(raw);
+                } catch(e) { memoriesDB = {}; }
+            }
+            if (Object.keys(memoriesDB).length === 0) {
+                seedEmotionalMemories();
+            }
+        }
+        
+        function seedEmotionalMemories() {
+            const today = new Date();
+            const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+            const lastWeek = new Date(today); lastWeek.setDate(today.getDate()-7);
+            const lastMonth = new Date(today); lastMonth.setDate(today.getDate()-20);
+            
+            memoriesDB["Elena"] = [
+                { id: Date.now()+1, text: "The rain caught us off guard. You laughed and spun me around — I still feel that joy when it rains.", dateISO: yesterday.toISOString(), dateString: formatDate(yesterday), hashtags: ["happy", "memory"], audioData: null, mood: "happy" },
+                { id: Date.now()+2, text: "Our first real fight about stupid things, but we ended up hugging under a blanket. That's when I knew we were unbreakable.", dateISO: lastWeek.toISOString(), dateString: formatDate(lastWeek), hashtags: ["fights", "love"], audioData: null, mood: "angry" },
+                { id: Date.now()+3, text: "You held my hand at the hospital. No words, just warmth. I'll never forget that strength.", dateISO: today.toISOString(), dateString: formatDate(today), hashtags: ["sad", "healing"], audioData: null, mood: "sad" },
+                { id: Date.now()+4, text: "We met at the old library — you recommended my favorite book. Fate smiled that day.", dateISO: lastMonth.toISOString(), dateString: formatDate(lastMonth), hashtags: ["meet", "destiny"], audioData: null, mood: "happy" }
+            ];
+            memoriesDB["Oliver"] = [
+                { id: Date.now()+5, text: "Road trip at midnight, singing to 80s rock. You said 'this is what freedom feels like.'", dateISO: yesterday.toISOString(), dateString: formatDate(yesterday), hashtags: ["happy", "adventure"], audioData: null, mood: "happy" },
+                { id: Date.now()+6, text: "You cried telling me about your fear of being forgotten. I promised I'll always remember. Forever.", dateISO: lastWeek.toISOString(), dateString: formatDate(lastWeek), hashtags: ["sad", "promise"], audioData: null, mood: "sad" }
+            ];
+            memoriesDB["Luna"] = [
+                { id: Date.now()+7, text: "Stargazing on the rooftop, you showed me Saturn through a tiny telescope. Magic exists.", dateISO: today.toISOString(), dateString: formatDate(today), hashtags: ["happy", "memory"], audioData: null, mood: "happy" },
+                { id: Date.now()+8, text: "Our misunderstanding lasted three days. Then you left a note: 'I miss your laugh.' I melted.", dateISO: lastWeek.toISOString(), dateString: formatDate(lastWeek), hashtags: ["fights", "forgiveness"], audioData: null, mood: "neutral" }
+            ];
+            saveToLocal();
+        }
+        
+        function formatDate(dateObj) {
+            return `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
+        }
+        
+        function detectMoodFromText(text){
+            let t = text.toLowerCase();
+            if(t.includes("love") || t.includes("happy") || t.includes("joy") || t.includes("laughter")) return "happy";
+            if(t.includes("sad") || t.includes("cry") || t.includes("tears") || t.includes("hurt")) return "sad";
+            if(t.includes("angry") || t.includes("hate") || t.includes("fury") || t.includes("mad")) return "angry";
+            return "neutral";
+        }
+        
+        function extractHashtags(raw) {
+            let parts = raw.split(/\s+/);
+            let tags = [];
+            for (let p of parts) {
+                if (p.startsWith('#')) {
+                    let clean = p.slice(1).toLowerCase().trim();
+                    if (clean) tags.push(clean);
+                }
+            }
+            if (tags.length === 0) tags.push("memory");
+            return tags;
+        }
+        
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordedAudioData = null;
+        
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.start();
+                alert("🎙️ Recording... speak your memory.");
+            } catch(e) { alert("Microphone needed"); }
+        }
+        
+        function stopRecording() {
+            if(mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: "audio/webm" });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => { recordedAudioData = reader.result; alert("✅ Audio recorded!"); };
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                };
+                mediaRecorder.stop();
+            }
+        }
+        
+        function addMemoryForPerson(person, text, hashtagRaw, audioBase64 = null) {
+            if (!text.trim()) return false;
+            const now = new Date();
+            const mood = detectMoodFromText(text);
+            const newMemory = {
+                id: Date.now() + Math.random() * 10000,
+                text: text.trim(),
+                dateISO: now.toISOString(),
+                dateString: formatDate(now),
+                hashtags: extractHashtags(hashtagRaw),
+                audioData: audioBase64 || null,
+                mood: mood
+            };
+            if (!memoriesDB[person]) memoriesDB[person] = [];
+            memoriesDB[person].unshift(newMemory);
+            saveToLocal();
+            createFloatingHeart();
+            return true;
+        }
+        
+        function deleteMemory(person, memoryId) {
+            if (memoriesDB[person]) {
+                memoriesDB[person] = memoriesDB[person].filter(m => m.id != memoryId);
+                saveToLocal();
+                renderTimelineOnly(currentActivePerson);
+                updateFilterChips(currentActivePerson);
+            }
+        }
+        
+        // RENDER ONLY TIMELINE DOTS (no memory boxes)
+        function renderTimelineOnly(person) {
+            const timelineDiv = document.getElementById("timelineContainer");
+            timelineDiv.innerHTML = "";
+            let memories = memoriesDB[person] || [];
+            if (currentCategoryFilter !== "all") {
+                memories = memories.filter(m => m.hashtags.includes(currentCategoryFilter));
+            }
+            if(memories.length === 0) {
+                timelineDiv.style.height = "40px";
+                document.getElementById("memoryStats").innerHTML = "⚡ no echoes";
+                return;
+            }
+            timelineDiv.style.position = "relative";
+            const containerHeight = timelineDiv.parentElement.clientHeight - 100;
+            const step = Math.max(38, Math.min(70, containerHeight / memories.length));
+            memories.forEach((mem, idx) => {
+                const dot = document.createElement("div");
+                dot.className = `timeline-dot mood-${mem.mood || "neutral"}`;
+                dot.style.top = (idx * step) + "px";
+                let preview = mem.text.length > 40 ? mem.text.substring(0,37)+"…" : mem.text;
+                dot.setAttribute("data-title", `${mem.dateString} · ${preview}`);
+                dot.onclick = (e) => { e.stopPropagation(); openMemoryViewModal(mem, person); };
+                dot.oncontextmenu = (e) => { e.preventDefault(); if(confirm("delete this memory?")) deleteMemory(person, mem.id); };
+                timelineDiv.appendChild(dot);
+            });
+            document.getElementById("memoryStats").innerHTML = `📌 ${memories.length} memories · right-click dot to delete`;
+        }
+        
+        function openMemoryViewModal(memory, person) {
+            const modal = document.getElementById("viewModal");
+            document.getElementById("modalTitle").innerHTML = `📖 ${memory.dateString} · ${person}`;
+            document.getElementById("modalText").innerHTML = memory.text;
+            const audioDiv = document.getElementById("modalAudio");
+            if(memory.audioData){
+                audioDiv.innerHTML = `<audio controls src="${memory.audioData}" style="width:100%; margin-top:12px;"></audio>`;
+            } else {
+                audioDiv.innerHTML = `<span style="font-size:12px; color:#a5a56e;">🎙️ no audio</span>`;
+            }
+            const voiceControls = document.getElementById("modalVoiceControls");
+            voiceControls.innerHTML = `<select id="ttsVoiceSelect" style="background:#1f1f12; color:#e2e2b6; padding:6px;"><option value="0">Voice 1</option><option value="1">Voice 2</option><option value="2">Voice 3</option></select>
+            <button id="playTTSBtn" class="mini-btn" style="margin-left:8px;">🔊 Read Aloud</button>`;
+            modal.style.display = "flex";
+            document.getElementById("playTTSBtn").onclick = () => {
+                const speech = new SpeechSynthesisUtterance(memory.text);
+                const voices = speechSynthesis.getVoices();
+                const sel = document.getElementById("ttsVoiceSelect").value;
+                if(voices[sel]) speech.voice = voices[sel];
+                speech.rate = 0.9;
+                speechSynthesis.cancel();
+                speechSynthesis.speak(speech);
+            };
+        }
+        
+        let currentCategoryFilter = "all";
+        
+        function updateFilterChips(person) {
+            const mems = memoriesDB[person] || [];
+            let catSet = new Set();
+            mems.forEach(m => m.hashtags.forEach(t => catSet.add(t)));
+            const categories = Array.from(catSet).sort();
+            const filterDiv = document.getElementById("filterBar");
+            if(categories.length === 0 && mems.length === 0) {
+                filterDiv.innerHTML = "";
+                return;
+            }
+            filterDiv.innerHTML = "";
+            const allChip = document.createElement("div");
+            allChip.className = `cat-pill ${currentCategoryFilter === "all" ? "active" : ""}`;
+            allChip.innerText = "all";
+            allChip.onclick = () => { currentCategoryFilter = "all"; renderTimelineOnly(person); updateFilterChips(person); };
+            filterDiv.appendChild(allChip);
+            categories.forEach(cat => {
+                const chip = document.createElement("div");
+                chip.className = `cat-pill ${currentCategoryFilter === cat ? "active" : ""}`;
+                chip.innerText = `#${cat}`;
+                chip.onclick = () => { currentCategoryFilter = cat; renderTimelineOnly(person); updateFilterChips(person); };
+                filterDiv.appendChild(chip);
+            });
+        }
+        
+        function refreshUI(person) {
+            renderTimelineOnly(person);
+            updateFilterChips(person);
+            const quoteBank = [
+                "“the most beautiful memories live in the spaces between heartbeats”",
+                "“some souls just stay — in laughter, in tears”",
+                "“every memory is a thread that weaves us closer”",
+                "“you are a constellation of moments I never want to forget”"
+            ];
+            document.getElementById("dynamicQuote").innerHTML = `✨ ${quoteBank[Math.floor(Math.random() * quoteBank.length)]} ✨`;
+            const memCount = (memoriesDB[person] || []).length;
+            const hint = document.getElementById("emptyHint");
+            if(memCount === 0) hint.innerHTML = "✨ no memories yet · click 'Add Memory' ✨";
+            else hint.innerHTML = "✦ click on any dot to read a memory ✦";
+        }
+        
+        // Open Diary
+        function openDiaryLevel100(personName) {
+            currentActivePerson = personName;
+            currentCategoryFilter = "all";
+            document.getElementById("tree").style.display = "none";
+            const overlay = document.getElementById("diaryMaster");
+            overlay.style.display = "flex";
+            document.getElementById("diaryPersonName").innerText = personName;
+            refreshUI(personName);
+            document.getElementById("memoryText").value = "";
+            document.getElementById("hashTags").value = "";
+            recordedAudioData = null;
+            const adderPanel = document.getElementById("memoryAdderPanel");
+            adderPanel.classList.remove("visible");
+            adderPanel.style.display = "none";
+        }
+        
+        function closeDiary() {
+            document.getElementById("diaryMaster").style.display = "none";
+            document.getElementById("tree").style.display = "block";
+            if (treeData) { ctx.putImageData(treeData, 0, 0); if (activeFlower) drawNameLabel(activeFlower); }
+        }
+        
+        function toggleAddMemoryPanel() {
+            const panel = document.getElementById("memoryAdderPanel");
+            if (panel.style.display === "none" || panel.style.display === "") {
+                panel.style.display = "block";
+                panel.classList.add("visible");
+            } else {
+                panel.style.display = "none";
+                panel.classList.remove("visible");
+            }
+        }
+        
+        function createFloatingHeart() {
+            const master = document.getElementById("diaryMaster");
+            const heart = document.createElement("div");
+            heart.className = "floating-heart";
+            heart.innerHTML = "❤️";
+            heart.style.left = Math.random() * 80 + 10 + "%";
+            heart.style.bottom = "20px";
+            heart.style.position = "fixed";
+            master.appendChild(heart);
+            setTimeout(() => heart.remove(), 2000);
+        }
+        
+        // ----------------------------- TREE DRAWING --------------------
+        function drawLand() { ctx.fillStyle = "#0a0f08"; ctx.beginPath(); ctx.moveTo(0, height); ctx.lineTo(width, height); ctx.lineTo(width, height - 45); ctx.lineTo(0, height - 45); ctx.closePath(); ctx.fill(); ctx.fillStyle = "#1a3a1a"; for (let i=0; i<80; i++) { ctx.fillRect(Math.random()*width, height-42+Math.random()*15, 2, Math.random()*5); } }
+        function drawBranch(x, y, len, angle, lineWidth) { if (len < 8) { if (flowers.length < 45) { let namePick = soulNames[Math.floor(Math.random() * soulNames.length)]; flowers.push({ x: x, y: y, name: namePick }); } return; } ctx.beginPath(); ctx.lineWidth = lineWidth; ctx.strokeStyle = "#1de93b"; ctx.shadowBlur = 6; ctx.shadowColor = "#7eff5e"; let x2 = x + len * Math.cos(angle); let y2 = y - len * Math.sin(angle); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke(); let branchesCount = Math.random() > 0.4 ? 2 : 3; for (let i=0; i<branchesCount; i++) { let newAngle = angle + (Math.random() - 0.5) * 1.1; let newLen = len * (0.65 + Math.random() * 0.25); let newWidth = lineWidth * 0.48; setTimeout(() => { drawBranch(x2, y2, newLen, newAngle, newWidth); }, 75); } }
+        function drawNameLabel(flower) { ctx.font = "bold 16px 'Courier New'"; ctx.fillStyle = "#faffd0"; ctx.shadowBlur = 12; ctx.shadowColor = "#1de93b"; let tw = ctx.measureText(flower.name).width; ctx.fillText(flower.name, flower.x - tw/2, flower.y - 13); ctx.beginPath(); ctx.arc(flower.x, flower.y, 14, 0, Math.PI*2); ctx.fillStyle = "rgba(29,233,59,0.25)"; ctx.fill(); }
+        function detectHover() { activeFlower = null; let minDist = 42; for (let f of flowers) { let dx = mouse.x - f.x; let dy = mouse.y - f.y; let dist = Math.hypot(dx, dy); if (dist < minDist) { minDist = dist; activeFlower = f; } } }
+        function redrawCanvas() { if (treeData) { ctx.putImageData(treeData, 0, 0); if (activeFlower) drawNameLabel(activeFlower); } }
+        function captureTreeState() { treeData = ctx.getImageData(0, 0, width, height); redrawCanvas(); }
+        function handleMouseMove(e) { const rect = canvas.getBoundingClientRect(); const scaleX = canvas.width / rect.width; const scaleY = canvas.height / rect.height; let canvasX = (e.clientX - rect.left) * scaleX; let canvasY = (e.clientY - rect.top) * scaleY; mouse.x = Math.min(Math.max(0, canvasX), width); mouse.y = Math.min(Math.max(0, canvasY), height); detectHover(); redrawCanvas(); }
+        function handleCanvasClick() { if (activeFlower) openDiaryLevel100(activeFlower.name); }
+        function handleResize() { width = window.innerWidth; height = window.innerHeight; canvas.width = width; canvas.height = height; flowers = []; ctx.clearRect(0,0,width,height); drawLand(); drawBranch(width/2, height-45, 100, Math.PI/2, 14); setTimeout(() => { captureTreeState(); detectHover(); redrawCanvas(); }, 1500); }
+        function initTree() { drawLand(); drawBranch(width/2, height-45, 100, Math.PI/2, 14); setTimeout(() => { captureTreeState(); detectHover(); redrawCanvas(); }, 2800); canvas.addEventListener("mousemove", handleMouseMove); canvas.addEventListener("click", handleCanvasClick); window.addEventListener("resize", () => { setTimeout(handleResize, 100); }); }
+        
+        // BIND
+        function bindEvents() {
+            document.getElementById("saveNewMemory").addEventListener("click", () => {
+                if (!currentActivePerson) return;
+                const text = document.getElementById("memoryText").value;
+                const hashRaw = document.getElementById("hashTags").value;
+                if (!text.trim()) { alert("write a memory first..."); return; }
+                addMemoryForPerson(currentActivePerson, text, hashRaw, recordedAudioData);
+                document.getElementById("memoryText").value = "";
+                document.getElementById("hashTags").value = "";
+                recordedAudioData = null;
+                refreshUI(currentActivePerson);
+                const panel = document.getElementById("memoryAdderPanel");
+                panel.style.display = "none";
+                panel.classList.remove("visible");
+            });
+            document.getElementById("closeMasterDiary").addEventListener("click", closeDiary);
+            document.getElementById("toggleAddMemoryBtn").addEventListener("click", toggleAddMemoryPanel);
+            document.getElementById("closeModalBtn").addEventListener("click", () => { document.getElementById("viewModal").style.display = "none"; });
+            document.getElementById("viewModal").addEventListener("click", () => { document.getElementById("viewModal").style.display = "none"; });
+            document.getElementById("voiceInputBtn").addEventListener("click", () => {
+                const SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if(SpeechRecog){
+                    let recog = new SpeechRecog();
+                    recog.start();
+                    recog.onresult = e => { document.getElementById("memoryText").value += " " + e.results[0][0].transcript; };
+                } else alert("speech not supported");
+            });
+            document.getElementById("startRecordBtn").addEventListener("click", startRecording);
+            document.getElementById("stopRecordBtn").addEventListener("click", stopRecording);
+        }
+        
+        loadFromLocal();
+        bindEvents();
+        setTimeout(() => { initTree(); }, 3200);
+    })();
+</script>
+</body>
+</html>
